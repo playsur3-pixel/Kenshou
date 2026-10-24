@@ -97,3 +97,7 @@ Accessible depuis le bouton Paramètres de l’en-tête, le bouton Règles du sa
 La page regroupe l’objectif de victoire (1, 3, 5, 7 ou 10 points), les points en cas de double réussite, les dictionnaires, les trois durées et les quotas par équipe. Un récapitulatif suit les modifications. Les mots courants restent obligatoires.
 
 Depuis l’accueil, les préférences enregistrées sont mémorisées dans le navigateur et envoyées au serveur lors de la création du prochain salon. Dans un salon, les règles du salon sont prioritaires : seul l’hôte peut les enregistrer avant le lancement ; les invités les consultent en lecture seule. Les règles sont verrouillées pendant la partie. Le bouton de retour aux valeurs standard prépare les réglages initiaux ; cliquer sur Enregistrer pour les appliquer.
+
+## Hébergement Netlify et Render
+
+Voir [DEPLOIEMENT.md](DEPLOIEMENT.md). La commande de build est npm run build et le dossier publié est dist. Le serveur multijoueur est lancé séparément sur Render.

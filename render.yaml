@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: kenshou
+    runtime: node
+    plan: free
+    buildCommand: node scripts/check.mjs
+    startCommand: node server/index.mjs
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: ALLOWED_ORIGINS
+        sync: false

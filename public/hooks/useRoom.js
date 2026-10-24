@@ -1,18 +1,22 @@
+const API_BASE = '';
+const API_CONFIGURED = true;
 // Une session par onglet permet aussi de tester plusieurs joueurs sur un navigateur.
 export function useRoom(onState, onConnection, onError) {
   let session = null, controller = null, generation = 0;
   try { session = JSON.parse(sessionStorage.getItem('kenshou.session')); } catch { /* Stockage indisponible ou session périmée. */ }
   const save = () => { try { if (session) sessionStorage.setItem('kenshou.session', JSON.stringify(session)); else sessionStorage.removeItem('kenshou.session'); } catch { /* La session reste en mémoire. */ } };
   async function request(path, data, authenticated = false) {
-    const response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(authenticated ? { Authorization: `Bearer ${session.token}` } : {}) }, body: JSON.stringify(data) });
-    const result = await response.json(); if (!response.ok) throw new Error(result.error ?? 'Le serveur est indisponible.'); return result;
+    if (!API_CONFIGURED) throw new Error('Le serveur multijoueur n’est pas encore configuré pour ce site.');
+    const response = await fetch(API_BASE + path, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(authenticated ? { Authorization: `Bearer ${session.token}` } : {}) }, body: JSON.stringify(data) });
+    const result = await response.json().catch(() => ({ error: 'Le serveur multijoueur est indisponible. Vérifiez sa configuration.' })); if (!response.ok) throw new Error(result.error ?? 'Le serveur est indisponible.'); return result;
   }
   async function listen(current) {
+    if (!API_CONFIGURED) { onConnection('offline'); onState(null); onError('Le serveur multijoueur n’est pas encore configuré pour ce site.'); return; }
     let delay = 800;
     while (session && current === generation) {
       controller = new AbortController(); onConnection('connecting');
       try {
-        const response = await fetch(`/api/events?room=${encodeURIComponent(session.room)}`, { headers: { Authorization: `Bearer ${session.token}` }, signal: controller.signal });
+        const response = await fetch(`${API_BASE}/api/events?room=${encodeURIComponent(session.room)}`, { headers: { Authorization: `Bearer ${session.token}` }, signal: controller.signal });
         if (!response.ok) { const result = await response.json(); if ([401, 404].includes(response.status)) { session = null; save(); onState(null); onError(result.error); return; } throw new Error(result.error); }
         onConnection('online'); delay = 800;
         const reader = response.body.getReader(), decoder = new TextDecoder(); let buffer = '';

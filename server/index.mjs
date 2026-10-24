@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { GameStore, GameError } from './game.mjs';
 
+const allowedOrigins = new Set((process.env.ALLOWED_ORIGINS ?? '').split(',').map(value => value.trim()).filter(Boolean));
 const root = fileURLToPath(new URL('../', import.meta.url));
 const dictionaries = {};
 for (const [key, file] of [['easy', 'facile'], ['medium', 'moyen'], ['hard', 'difficile']]) {
@@ -33,8 +34,13 @@ export const server = http.createServer(async (req, res) => {
     if (url.pathname === '/api/health') return json(res, 200, { ok: true, app: 'kenshou' });
     if (url.pathname.startsWith('/api/')) {
       rate(req);
-      // Les clients sont servis par la même origine ; aucun accès CORS externe.
-      if (req.headers.origin && req.headers.origin !== `http://${req.headers.host}` && req.headers.origin !== `https://${req.headers.host}`) throw new GameError('Origine non autorisée.', 403);
+      const origin = req.headers.origin;
+      const sameOrigin = origin === `http://${req.headers.host}` || origin === `https://${req.headers.host}`;
+      if (origin && !sameOrigin && !allowedOrigins.has(origin)) throw new GameError('Origine non autorisée.', 403);
+      if (origin) { res.setHeader('Access-Control-Allow-Origin', origin); res.setHeader('Vary', 'Origin'); }
+      if (req.method === 'OPTIONS') {
+        res.writeHead(204, { ...headers, 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type, Authorization', 'Access-Control-Max-Age': '600' }); res.end(); return;
+      }
       if (req.method === 'POST' && url.pathname === '/api/rooms') { const data = await body(req); return json(res, 201, store.create(data.name, data.rules)); }
       if (req.method === 'POST' && url.pathname === '/api/join') { const data = await body(req); const result = store.join(data.room, data.name); broadcast(store.get(data.room)); return json(res, 200, result); }
       const room = store.get(url.searchParams.get('room'));
