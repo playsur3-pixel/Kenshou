@@ -48,6 +48,22 @@ export function useRoom(onState, onConnection, onError, onServerStatus = () => {
   let session = null, controller = null, generation = 0, entryController = null, entryCanCancel = false;
   try { session = JSON.parse(sessionStorage.getItem('kenshou.session')); } catch { /* Stockage indisponible ou session périmée. */ }
   const save = () => { try { if (session) sessionStorage.setItem('kenshou.session', JSON.stringify(session)); else sessionStorage.removeItem('kenshou.session'); } catch { /* La session reste en mémoire. */ } };
+  let warmTask = null, warmController = null, warmListener = null, warmStatus = null, warmReadyAt = 0;
+  function warmServer(listener = null) {
+    warmListener = listener;
+    if (warmTask && (!warmReadyAt || Date.now() - warmReadyAt < 30000)) {
+      if (listener && warmStatus) listener(warmStatus);
+      return warmTask;
+    }
+    warmReadyAt = 0; warmStatus = null; warmController = new AbortController();
+    const task = waitForServer({ signal: warmController.signal, onStatus: status => {
+      warmStatus = status; warmListener?.(status);
+    } }).then(() => { warmReadyAt = Date.now(); }).catch(error => {
+      if (warmTask === task) warmTask = null;
+      throw error;
+    });
+    warmTask = task; return task;
+  }
   async function request(path, data, authenticated = false) {
     if (!API_CONFIGURED) throw new Error('Le serveur multijoueur n’est pas encore configuré pour ce site.');
     const response = await fetch(API_BASE + path, { signal: AbortSignal.timeout(20000), method: 'POST', headers: { 'Content-Type': 'application/json', ...(authenticated ? { Authorization: `Bearer ${session.token}` } : {}) }, body: JSON.stringify(data) });
@@ -75,13 +91,15 @@ export function useRoom(onState, onConnection, onError, onServerStatus = () => {
   }
   function connect() { generation++; controller?.abort(); if (session) void listen(generation); }
   return {
-    resume: connect,
+    // Le réveil démarre au chargement, sans bloquer la saisie et sans boucle permanente.
+    resume() { if (!session) void this.prewarm(); connect(); },
+    prewarm() { return API_CONFIGURED ? warmServer().catch(() => {}) : Promise.resolve(); },
     async enter(name, code, rules) {
       if (entryController) throw new Error('Une connexion est déjà en cours.');
       const waking = new AbortController(); entryController = waking; entryCanCancel = true;
       try {
         if (!API_CONFIGURED) throw new Error('Le serveur multijoueur n’est pas encore configuré pour ce site.');
-        await waitForServer({ signal: waking.signal, onStatus: onServerStatus });
+        await warmServer(onServerStatus);
         entryCanCancel = false;
         onServerStatus({ phase: code ? 'joining' : 'creating', elapsed: 0 });
         session = await request(code ? '/api/join' : '/api/rooms', { name, room: code, ...(code ? {} : { rules }) });
@@ -91,9 +109,9 @@ export function useRoom(onState, onConnection, onError, onServerStatus = () => {
         const message = cancelled ? 'Réveil annulé.' : ['TimeoutError', 'AbortError'].includes(error.name) ? 'Le serveur n’a pas confirmé l’ouverture du salon à temps. Réessayez dans quelques instants.' : error.message === 'Failed to fetch' ? 'Connexion au serveur impossible. Vérifiez votre connexion ou réessayez.' : error.message;
         onServerStatus({ phase: cancelled ? 'cancelled' : 'error', message });
         throw new Error(message);
-      } finally { entryController = null; entryCanCancel = false; }
+      } finally { entryController = null; entryCanCancel = false; warmListener = null; }
     },
-    cancelEntry() { if (entryCanCancel) entryController?.abort(); },
+    cancelEntry() { if (entryCanCancel) { entryController?.abort(); warmController?.abort(); } },
     async action(type, data = {}) { if (!session) throw new Error('Rejoignez un salon.'); return request(`/api/action?room=${session.room}`, { type, data }, true); },
     async leave() { await this.action('leave'); generation++; controller?.abort(); session = null; save(); onState(null); },
     forget() { generation++; controller?.abort(); session = null; save(); onState(null); }

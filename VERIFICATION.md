@@ -37,3 +37,5 @@ Page vérifiée sur ordinateur et à 390 px de large sans débordement horizonta
 - Build Netlify vérifié avec KENSHOU_API_URL=https://kenshou.onrender.com.
 - Le retard de démarrage est simulé pour ces contrôles ; aucune mise en veille forcée du vrai service Render.
 Le parcours mobile à 390 px avec neuf secondes de retard a ouvert automatiquement un seul salon ; aucun débordement horizontal.
+
+Réveil anticipé ajouté : 34 tests réussis, dont déclenchement avant toute création, partage du contrôle entre chargement et clic, réutilisation d’un serveur récemment prêt, annulation et nouvelle tentative. Parcours navigateur local confirmé avec réponse retardée : saisie disponible, ouverture automatique du salon, retour à l’accueil avec création de nouveau possible.
