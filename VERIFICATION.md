@@ -29,3 +29,11 @@ L’agencement retenu est celui de la première version (score supérieur, équi
 Vérifications de la page #parametres : sauvegarde puis actualisation des préférences (7 points, mots rares, 30 secondes et point pour chaque réussite), création du salon avec ces valeurs, modification par l’hôte à 5 points et affichage du nouvel objectif dans le salon. Un invité reçoit les règles à jour et tous ses champs sont en lecture seule. Le retour aux valeurs standard puis l’enregistrement ont été vérifiés ; les préférences de test ont été remises aux valeurs standard. Aucun avertissement ni erreur console sur ces parcours.
 
 Page vérifiée sur ordinateur et à 390 px de large sans débordement horizontal. Vérification de syntaxe des dix modules et 19 tests métier/HTTP réussis après la modification.
+## Réveil Render — 26 octobre 2026
+
+- 31 tests réussis, dont serveur déjà disponible, démarrage lent, page de chargement HTML, 503 temporaire, expiration de tentative, expiration globale, annulation et absence de double création.
+- Le test vérifie aussi les en-têtes d’autorisation sur /api/health pour Netlify, et le refus des origines inconnues.
+- Parcours navigateur local avec une disponibilité retardée : attente affichée, annulation, pseudo conservé et nouvelle tentative.
+- Build Netlify vérifié avec KENSHOU_API_URL=https://kenshou.onrender.com.
+- Le retard de démarrage est simulé pour ces contrôles ; aucune mise en veille forcée du vrai service Render.
+Le parcours mobile à 390 px avec neuf secondes de retard a ouvert automatiquement un seul salon ; aucun débordement horizontal.

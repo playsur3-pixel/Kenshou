@@ -101,3 +101,9 @@ Depuis l’accueil, les préférences enregistrées sont mémorisées dans le na
 ## Hébergement Netlify et Render
 
 Voir [DEPLOIEMENT.md](DEPLOIEMENT.md). La commande de build est npm run build et le dossier publié est dist. Le serveur multijoueur est lancé séparément sur Render.
+
+## Réveil du serveur à la création ou à la connexion
+
+Un clic sur Créer un salon ou Rejoindre vérifie d’abord /api/health. Si le serveur tarde à répondre, le site affiche un état de réveil et le temps écoulé, puis ouvre le salon automatiquement quand le serveur est prêt. Une attente peut être annulée en conservant le pseudo. Après deux minutes sans réponse, le formulaire redevient disponible et affiche un message explicite.
+
+Le contrôle de disponibilité est relancé si nécessaire, mais la commande de création est envoyée une seule fois. Le réveil est déclenché par l’action du joueur ; il ne s’agit pas d’un maintien permanent du service actif. Le contrôle /api/health applique la même autorisation d’origine que les autres routes.

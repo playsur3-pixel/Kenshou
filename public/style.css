@@ -328,3 +328,23 @@ label { color: #dce7f8; }
   .top-actions .settings-nav span { display: none; }
   .top-actions .settings-nav { width: 28px; }
 }
+
+/* Réveil Render : état accessible, attente visible et annulation sans perdre le pseudo. */
+.server-status { margin-top: 19px; padding: 15px; background: #eaf4fc; border: 1px solid #bed8ed; border-radius: 11px; color: #284e72; }
+.server-status[hidden] { display: none; }
+.server-status-main { display: flex; align-items: flex-start; gap: 10px; }
+.server-status-dot { width: 9px; height: 9px; border: 2px solid #4488b6; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+.server-status[data-phase="checking"] .server-status-dot, .server-status[data-phase="waking"] .server-status-dot { border-color: #4395c944; border-top-color: #287aad; animation: server-wake-spin 1s linear infinite; }
+.server-status strong { display: block; font-size: 12px; font-weight: 650; }
+.server-status p { color: #526d88; font-size: 11px; line-height: 1.75; margin: 5px 0 0; }
+.server-status-bottom { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 7px; }
+.server-status-bottom>span { color: #638099; font-size: 10px; }
+.server-status .text-button { color: #316c99; font-size: 11px; padding: 4px 0; }
+.server-status [hidden] { display: none; }
+.server-status[data-phase="ready"], .server-status[data-phase="creating"], .server-status[data-phase="joining"] { background: #eaf7f3; border-color: #baded4; }
+.server-status[data-phase="ready"] .server-status-dot, .server-status[data-phase="creating"] .server-status-dot, .server-status[data-phase="joining"] .server-status-dot { background: #388777; border-color: #388777; }
+.server-status[data-phase="error"] { background: #fff1ef; border-color: #eac5bf; color: #8c4438; }
+.server-status[data-phase="error"] .server-status-dot { border-color: #b25c4b; }
+.server-status[data-phase="cancelled"] { background: #f0f3f8; border-color: #d2dce8; }
+@keyframes server-wake-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .server-status-dot { animation: none!important; } }

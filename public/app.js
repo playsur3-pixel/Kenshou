@@ -19,6 +19,37 @@ const icons = {
 const icon = name => `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${icons[name] ?? icons.leaf}</svg>`;
 const app = $('#app'), sound = useSound();
 let state = null, connection = 'connecting', previous = null, settingsDraft = null, help = false, dismissedWinner = '', toastTimer, busy = false;
+let entryStatus = { phase: 'idle', elapsed: 0 }, entryMode = 'create';
+function serverStatusMarkup() {
+  return `<div id="server-status" class="server-status" hidden><div class="server-status-main"><span class="server-status-dot" aria-hidden="true"></span><div role="status" aria-live="polite"><strong id="server-status-title"></strong><p id="server-status-description"></p></div></div><div class="server-status-bottom"><span id="server-status-elapsed" aria-live="off"></span><button class="text-button" type="button" data-action="cancel-wake" hidden>Annuler</button></div></div>`;
+}
+function paintEntryStatus() {
+  const status = $('#server-status'), form = $('#entry-form');
+  if (!status || !form) return;
+  const phase = entryStatus.phase;
+  const pending = ['checking', 'waking', 'ready', 'creating', 'joining'].includes(phase);
+  const labels = {
+    checking: ['Connexion au serveur…', 'Vérification de la disponibilité du serveur de jeu.'],
+    waking: ['Réveil du serveur en cours…', 'Le serveur peut être en veille. Son démarrage peut prendre environ une minute. Gardez cette page ouverte.'],
+    ready: ['Serveur disponible', 'Le serveur répond. Préparation de votre salon…'],
+    creating: ['Serveur disponible · Création du salon…', 'Votre salon va s’ouvrir automatiquement.'],
+    joining: ['Serveur disponible · Connexion au salon…', 'Vous allez retrouver les autres joueurs.'],
+    error: ['Connexion impossible', entryStatus.message ?? 'Réessayez dans quelques instants.'],
+    cancelled: ['Réveil annulé', 'Vous pouvez réessayer quand vous le souhaitez.']
+  };
+  status.hidden = phase === 'idle'; status.dataset.phase = phase;
+  $('#server-status-title').textContent = labels[phase]?.[0] ?? '';
+  $('#server-status-description').textContent = labels[phase]?.[1] ?? '';
+  $('#server-status-elapsed').textContent = ['checking', 'waking'].includes(phase) ? `${entryStatus.elapsed ?? 0} s écoulée(s)` : '';
+  $('[data-action="cancel-wake"]', status).hidden = !['checking', 'waking'].includes(phase);
+  form.setAttribute('aria-busy', String(pending));
+  for (const input of form.querySelectorAll('input')) input.disabled = pending;
+  for (const button of form.querySelectorAll('button[type="submit"]')) {
+    button.disabled = pending;
+    button.innerHTML = pending && button.value === entryMode ? `${phase === 'checking' ? 'Connexion…' : ['ready', 'creating', 'joining'].includes(phase) ? 'Ouverture…' : 'Réveil en cours…'} ${icon('arrow')}` : button.value === 'create' ? `Créer un salon ${icon('arrow')}` : `Rejoindre ${icon('arrow')}`;
+  }
+}
+
 function toast(message) { $('#toast').textContent = message; $('#toast').classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => $('#toast').classList.remove('show'), 5000); }
 const timer = useTimer(() => state, (seconds, current) => {
   for (const element of document.querySelectorAll('#clock, #vote-clock')) { element.textContent = `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`; element.classList.toggle('urgent', current.playing && seconds <= 10); }
@@ -30,14 +61,14 @@ const room = useRoom(next => {
     previous = next;
   } else previous = null;
   state = next; render();
-}, next => { connection = next; const badge = $('#connection'); if (badge) { badge.textContent = next === 'online' ? 'En direct' : 'Reconnexion…'; badge.className = `connection ${next}`; } const banner = $('#connection-warning'); if (banner) banner.hidden = next === 'online'; }, toast);
+}, next => { connection = next; const badge = $('#connection'); if (badge) { badge.textContent = next === 'online' ? 'En direct' : 'Reconnexion…'; badge.className = `connection ${next}`; } const banner = $('#connection-warning'); if (banner) banner.hidden = next === 'online'; }, toast, next => { entryStatus = next; paintEntryStatus(); });
 
 function header(inRoom = false) {
   return `<header class="topbar"><a class="brand" href="/" aria-label="Kenshou, accueil"><img src="/favicon.svg" alt="" width="40" height="40"><span>kenshou<span class="brand-dot">.</span></span></a><div class="top-actions">${inRoom ? `<span id="connection" class="connection ${connection}">${connection === 'online' ? 'En direct' : 'Reconnexion…'}</span>` : '<span class="tag desktop-only">LE POIDS DES MOTS</span>'}<button class="icon-button" data-action="sound" aria-label="${sound.enabled ? 'Désactiver' : 'Activer'} les sons" title="${sound.enabled ? 'Désactiver' : 'Activer'} les sons">${icon(sound.enabled ? 'sound' : 'mute')}</button><button class="text-button settings-nav" data-action="settings" aria-label="Paramètres">${icon('settings')}<span>Paramètres</span></button><button class="text-button" data-action="help" aria-label="Les règles">${icon('book')}<span>Les règles</span></button></div></header>`;
 }
 function home() {
   const queryCode = new URLSearchParams(location.search).get('salon') ?? '';
-  return `${header()}<main class="home"><div class="hero"><div class="eyebrow"><span class="tiny-line"></span> L’ART DE L’ESQUIVATION</div><h1>Chaque mot<br>peut être un <em>piège.</em></h1><p class="hero-description">Guidez votre équipe vers le bon mot.<br>Évitez ceux que vos adversaires vous réservent.</p><div class="hero-meta"><span>${icon('users')} 4 à 16 joueurs</span><span>${icon('sound')} Sur votre vocal préféré</span></div><div class="word-art" aria-hidden="true"><div class="orbit"></div><div class="art-label">CE QU’IL FAUT FAIRE DEVINER</div><div class="art-word">ÉCLIPSE<span>✳</span></div><div class="art-traps"><span>soleil</span><span>lune</span><span>ombre</span></div><div class="art-caption">L’art de dire… sans tout dire.</div></div></div><section class="entry-card"><div class="entry-identity"><img src="/favicon.svg" alt="Logo historique de Kenshou" width="68" height="68"><div><strong>KENSHOU</strong><span>L’art de l’esquivation !</span></div></div><div class="card-kicker">À VOUS DE JOUER</div><h2>La partie commence ici.</h2><p>Rassemblez vos amis. Le reste, c’est une histoire de mots.</p><form id="entry-form"><label for="nickname">Votre pseudo</label><input id="nickname" name="nickname" placeholder="Comment vous appelle-t-on ?" required minlength="2" maxlength="20" autocomplete="nickname"><button class="button primary full" type="submit" name="mode" value="create">Créer un salon ${icon('arrow')}</button><div class="divider"><span>ou rejoindre vos amis</span></div><label for="room-code">Code du salon</label><div class="join-row"><input id="room-code" name="code" value="${esc(queryCode)}" placeholder="A1B2C3" maxlength="6" pattern="[A-Fa-f0-9]{6}" autocapitalize="characters" autocomplete="off"><button class="button secondary" type="submit" name="mode" value="join">Rejoindre ${icon('arrow')}</button></div></form><div class="entry-note"><span class="status-dot"></span> Gratuit. Sans compte. Juste entre vous.</div></section></main><footer class="home-footer"><span>UN SAGE. DES DISCIPLES. QUELQUES MOTS DE TROP.</span><span>Fait pour jouer ensemble <span class="accent">✳</span></span></footer>`;
+  return `${header()}<main class="home"><div class="hero"><div class="eyebrow"><span class="tiny-line"></span> L’ART DE L’ESQUIVATION</div><h1>Chaque mot<br>peut être un <em>piège.</em></h1><p class="hero-description">Guidez votre équipe vers le bon mot.<br>Évitez ceux que vos adversaires vous réservent.</p><div class="hero-meta"><span>${icon('users')} 4 à 16 joueurs</span><span>${icon('sound')} Sur votre vocal préféré</span></div><div class="word-art" aria-hidden="true"><div class="orbit"></div><div class="art-label">CE QU’IL FAUT FAIRE DEVINER</div><div class="art-word">ÉCLIPSE<span>✳</span></div><div class="art-traps"><span>soleil</span><span>lune</span><span>ombre</span></div><div class="art-caption">L’art de dire… sans tout dire.</div></div></div><section class="entry-card"><div class="entry-identity"><img src="/favicon.svg" alt="Logo historique de Kenshou" width="68" height="68"><div><strong>KENSHOU</strong><span>L’art de l’esquivation !</span></div></div><div class="card-kicker">À VOUS DE JOUER</div><h2>La partie commence ici.</h2><p>Rassemblez vos amis. Le reste, c’est une histoire de mots.</p><form id="entry-form"><label for="nickname">Votre pseudo</label><input id="nickname" name="nickname" placeholder="Comment vous appelle-t-on ?" required minlength="2" maxlength="20" autocomplete="nickname"><button class="button primary full" type="submit" name="mode" value="create">Créer un salon ${icon('arrow')}</button><div class="divider"><span>ou rejoindre vos amis</span></div><label for="room-code">Code du salon</label><div class="join-row"><input id="room-code" name="code" value="${esc(queryCode)}" placeholder="A1B2C3" maxlength="6" pattern="[A-Fa-f0-9]{6}" autocapitalize="characters" autocomplete="off"><button class="button secondary" type="submit" name="mode" value="join">Rejoindre ${icon('arrow')}</button></div></form>${serverStatusMarkup()}<div class="entry-note"><span class="status-dot"></span> Gratuit. Sans compte. Juste entre vous.</div></section></main><footer class="home-footer"><span>UN SAGE. DES DISCIPLES. QUELQUES MOTS DE TROP.</span><span>Fait pour jouer ensemble <span class="accent">✳</span></span></footer>`;
 }
 function teamCard(team) {
   const me = state.players.find(p => p.id === state.me), players = state.players.filter(p => p.team === team), sage = players.find(p => p.role === 'sage'), disciples = players.filter(p => p.role === 'disciple');
@@ -130,6 +161,7 @@ function render() {
   else if (state?.phase === 'finished' && dismissedWinner !== `${state.code}:${state.round}`) app.insertAdjacentHTML('beforeend', winnerModal());
   else if (state?.phase === 'choice' && state.playing && state.own && !state.own.locked) app.insertAdjacentHTML('beforeend', voteModal());
   for (const [id, draft] of Object.entries(drafts)) { const el = document.getElementById(id); if (el && !el.disabled && !id.startsWith('setting-')) { el.value = draft.value; if (el.type === 'checkbox') el.checked = draft.checked; } }
+  paintEntryStatus();
   const dialog = $('dialog'); if (dialog) { dialog.showModal(); dialog.addEventListener('cancel', event => { event.preventDefault(); if (help) { help = false; render(); } else if (dialog.id === 'winner-dialog') { dismissedWinner = `${state.code}:${state.round}`; render(); } }); }
   if (focusId) { const el = document.getElementById(focusId); if (el && !el.disabled && (!dialog || dialog.contains(el))) { el.focus({ preventScroll: true }); try { el.setSelectionRange(selection, selection); } catch { /* Select ou checkbox. */ } } }
 }
@@ -138,7 +170,8 @@ document.addEventListener('click', async event => {
   sound.unlock();
   const button = event.target.closest('[data-action]'); if (!button || button.disabled) return;
   const action = button.dataset.action;
-  if (action === 'sound') { sound.toggle(); render(); }
+  if (action === 'cancel-wake') { room.cancelEntry(); }
+  else if (action === 'sound') { sound.toggle(); render(); }
   else if (action === 'help') { help = true; render(); }
   else if (action === 'close-help') { help = false; render(); }
   else if (action === 'rules' || action === 'settings') { settingsDraft = null; if (location.hash === '#parametres') render(); else location.hash = 'parametres'; }
@@ -166,6 +199,7 @@ document.addEventListener('submit', async event => {
       const joining = event.submitter?.value === 'join';
       const code = String(data.get('code')).trim().toUpperCase();
       if (joining && !/^[A-F0-9]{6}$/.test(code)) throw new Error('Saisissez les 6 caractères du code du salon.');
+      entryMode = joining ? 'join' : 'create';
       await room.enter(String(data.get('nickname')), joining ? code : null, savedRules());
     } else if (form.id === 'word-form') {
       const input = $('#word-input'), word = String(data.get('word'));
@@ -186,7 +220,7 @@ document.addEventListener('submit', async event => {
       settingsDraft = { ...rules }; render();
     }
   } catch (error) { toast(error.message); }
-  finally { busy = false; if (submitter?.isConnected) submitter.disabled = false; }
+  finally { busy = false; if (submitter?.isConnected) submitter.disabled = false; if (form.id === 'entry-form') paintEntryStatus(); }
 });
 window.addEventListener('hashchange', () => { settingsDraft = null; render(); window.scrollTo(0, 0); });
 document.addEventListener('change', event => {

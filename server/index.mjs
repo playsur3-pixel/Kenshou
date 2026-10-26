@@ -31,7 +31,6 @@ function rate(req) {
 export const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://localhost');
-    if (url.pathname === '/api/health') return json(res, 200, { ok: true, app: 'kenshou' });
     if (url.pathname.startsWith('/api/')) {
       rate(req);
       const origin = req.headers.origin;
@@ -41,6 +40,7 @@ export const server = http.createServer(async (req, res) => {
       if (req.method === 'OPTIONS') {
         res.writeHead(204, { ...headers, 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type, Authorization', 'Access-Control-Max-Age': '600' }); res.end(); return;
       }
+      if (url.pathname === '/api/health') return json(res, 200, { ok: true, app: 'kenshou' });
       if (req.method === 'POST' && url.pathname === '/api/rooms') { const data = await body(req); return json(res, 201, store.create(data.name, data.rules)); }
       if (req.method === 'POST' && url.pathname === '/api/join') { const data = await body(req); const result = store.join(data.room, data.name); broadcast(store.get(data.room)); return json(res, 200, result); }
       const room = store.get(url.searchParams.get('room'));
