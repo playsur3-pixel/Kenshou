@@ -60,7 +60,7 @@ const room = useRoom(next => {
     if (previous && (next.round !== previous.round || next.phase !== previous.phase)) sound.play(next.phase === 'finished' ? 'win' : next.phase === 'choice' ? 'round' : 'phase');
     previous = next;
   } else previous = null;
-  state = next; render();
+  state = next; entryStatus = { phase: 'idle', elapsed: 0 }; render();
 }, next => { connection = next; const badge = $('#connection'); if (badge) { badge.textContent = next === 'online' ? 'En direct' : 'Reconnexion…'; badge.className = `connection ${next}`; } const banner = $('#connection-warning'); if (banner) banner.hidden = next === 'online'; }, toast, next => { entryStatus = next; paintEntryStatus(); });
 
 function header(inRoom = false) {
